@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kronos - Premium Countdown</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top right, #1e293b, #0f172a);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-dark {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+        }
+
+        .event-card {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .event-card:hover {
+            transform: scale(1.02) translateY(-8px);
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        #fullscreen-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .animate-in {
+            animation: fadeInScale 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .pulse {
+            animation: pulse-animation 2s infinite;
+        }
+
+        @keyframes pulse-animation {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        input::placeholder, select::placeholder { color: rgba(255,255,255,0.2); }
+        
+        .modal-overlay {
+            display: none;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 50;
+        }
+
+        select option {
+            background: #1e293b;
+            color: white;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-12">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-16 space-y-6 md:space-y-0">
+            <div class="text-center md:text-left">
+                <h1 class="text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-blue-400 to-emerald-400">
+                    KRONOS
+                </h1>
+                <p class="text-slate-400 font-light mt-2 tracking-widest text-sm uppercase">Next Generation Event Tracking</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button onclick="testAudio()" class="w-12 h-12 glass rounded-full flex items-center justify-center hover:bg-white/10 transition-all" title="Test Alert">
+                    🔊
+                </button>
+                <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-2xl font-bold transition-all shadow-xl shadow-blue-900/30">
+                    + Create Event
+                </button>
+            </div>
+        </header>
+
+        <!-- Events Grid -->
+        <main id="events-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <!-- Cards will be injected here -->
+        </main>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="text-center py-32 hidden animate-in">
+            <div class="text-8xl mb-6 opacity-10">⌛</div>
+            <p class="text-slate-500 text-xl font-light">The timeline is empty. Start your first countdown.</p>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="modal-overlay" class="modal-overlay fixed inset-0 flex items-center justify-center p-4">
+        <div class="glass w-full max-w-xl rounded-[2.5rem] p-8 md:p-12 relative animate-in max-h-[95vh] overflow-y-auto">
+            <button onclick="closeModal()" class="absolute top-8 right-8 text-white/30 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            
+            <h2 id="modal-title" class="text-3xl font-bold mb-8">New Event</h2>
+            
+            <div class="space-y-6">
+                <input type="hidden" id="edit-id">
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase ml-1">Event Name</label>
+                    <input type="text" id="input-name" placeholder="e.g. World Tour Launch" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 mt-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase ml-1">Target Date & Time</label>
+                    <input type="datetime-local" id="input-date" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 mt-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase ml-1">Background Image URL</label>
+                    <input type="text" id="input-image" placeholder="https://unsplash.com/..." class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 mt-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase ml-1">Tick Sound Effect</label>
+                    <select id="input-sound" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 mt-2 focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
+                        <option value="none">None</option>
+                        <option value="click">Mechanical Click</option>
+                        <option value="beep">Digital Beep</option>
+                    </select>
+                </div>
+                
+                <button onclick="handleSave()" id="save-btn" class="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-2xl font-black text-lg shadow-lg transition-all mt-4">
+                    SAVE EVENT
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Overlay -->
+    <div id="fullscreen-overlay" class="flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/60 z-0"></div>
+        
+        <div class="relative z-10 glass-dark p-10 md:p-20 rounded-[4rem] text-center max-w-[95vw]">
+            <div class="absolute top-10 right-10 flex space-x-4">
+                <button id="mute-toggle" onclick="toggleMute()" class="text-white/40 hover:text-white transition-colors">
+                    <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" id="mute-icon">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    </svg>
+                </button>
+                <button onclick="exitFullscreenMode()" class="text-white/40 hover:text-white transition-colors">
+                    <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <h2 id="fs-title" class="text-4xl md:text-7xl font-bold mb-12 tracking-tight">TITLE</h2>
+            
+            <div class="flex flex-wrap justify-center gap-6 md:gap-12">
+                <div class="glass p-8 rounded-[2rem] min-w-[120px] md:min-w-[200px]">
+                    <span id="fs-days" class="text-6xl md:text-9xl font-black block">00</span>
+                    <span class="text-blue-400 text-sm md:text-base font-bold uppercase tracking-widest mt-4 block">Days</span>
+                </div>
+                <div class="glass p-8 rounded-[2rem] min-w-[120px] md:min-w-[200px]">
+                    <span id="fs-hours" class="text-6xl md:text-9xl font-black block">00</span>
+                    <span class="text-blue-400 text-sm md:text-base font-bold uppercase tracking-widest mt-4 block">Hours</span>
+                </div>
+                <div class="glass p-8 rounded-[2rem] min-w-[120px] md:min-w-[200px]">
+                    <span id="fs-minutes" class="text-6xl md:text-9xl font-black block">00</span>
+                    <span class="text-blue-400 text-sm md:text-base font-bold uppercase tracking-widest mt-4 block">Minutes</span>
+                </div>
+                <div class="glass p-8 rounded-[2rem] min-w-[120px] md:min-w-[200px]">
+                    <span id="fs-seconds" class="text-6xl md:text-9xl font-black block text-indigo-400">00</span>
+                    <span class="text-indigo-400 text-sm md:text-base font-bold uppercase tracking-widest mt-4 block">Seconds</span>
+                </div>
+            </div>
+
+            <p id="fs-status" class="mt-16 text-white/30 text-lg font-light tracking-[0.5em] uppercase"></p>
+        </div>
+    </div>
+
+    <!-- Audio Elements -->
+    <audio id="alert-audio" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="tick-click" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="tick-beep" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/1070/1070-preview.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        let events = JSON.parse(localStorage.getItem('kronos-events')) || [];
+        let activeFullscreenId = null;
+        let isMuted = false;
+        const alertAudio = document.getElementById('alert-audio');
+        const clickAudio = document.getElementById('tick-click');
+        const beepAudio = document.getElementById('tick-beep');
+
+        window.onload = () => {
+            renderEvents();
+            setInterval(updateAllCountdowns, 1000);
+        };
+
+        // Modal Controls
+        function openModal(editId = null) {
+            const modal = document.getElementById('modal-overlay');
+            const title = document.getElementById('modal-title');
+            const saveBtn = document.getElementById('save-btn');
+            
+            modal.style.display = 'flex';
+            
+            if (editId) {
+                const ev = events.find(e => e.id === editId);
+                title.innerText = "Edit Event";
+                document.getElementById('edit-id').value = ev.id;
+                document.getElementById('input-name').value = ev.name;
+                const dateObj = new Date(ev.date);
+                dateObj.setMinutes(dateObj.getMinutes() - dateObj.getTimezoneOffset());
+                document.getElementById('input-date').value = dateObj.toISOString().slice(0, 16);
+                document.getElementById('input-image').value = ev.imageUrl;
+                document.getElementById('input-sound').value = ev.soundType || 'none';
+                saveBtn.innerText = "UPDATE EVENT";
+            } else {
+                title.innerText = "Create Event";
+                document.getElementById('edit-id').value = "";
+                document.getElementById('input-name').value = "";
+                document.getElementById('input-date').value = "";
+                document.getElementById('input-image').value = "";
+                document.getElementById('input-sound').value = "none";
+                saveBtn.innerText = "CREATE EVENT";
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').style.display = 'none';
+        }
+
+        function handleSave() {
+            const id = document.getElementById('edit-id').value;
+            const name = document.getElementById('input-name').value;
+            const date = document.getElementById('input-date').value;
+            const soundType = document.getElementById('input-sound').value;
+            const img = document.getElementById('input-image').value || 'https://images.unsplash.com/photo-1467810563316-b5476525c0f9?auto=format&fit=crop&q=80&w=2069';
+
+            if (!name || !date) return;
+
+            const targetTime = new Date(date).getTime();
+
+            if (id) {
+                const index = events.findIndex(e => e.id === id);
+                // When editing, we reset the notified flag, but keep original startTime unless target date changed significantly
+                events[index] = { 
+                    ...events[index], 
+                    name, 
+                    date: targetTime, 
+                    imageUrl: img, 
+                    soundType,
+                    notified: false 
+                };
+            } else {
+                events.push({
+                    id: Date.now().toString(),
+                    name,
+                    date: targetTime,
+                    startTime: Date.now(), // Store creation time for 7% calculation
+                    imageUrl: img,
+                    soundType,
+                    notified: false
+                });
+            }
+
+            saveEvents();
+            renderEvents();
+            closeModal();
+        }
+
+        function deleteEvent(e, id) {
+            e.stopPropagation();
+            events = events.filter(ev => ev.id !== id);
+            saveEvents();
+            renderEvents();
+        }
+
+        function openEdit(e, id) {
+            e.stopPropagation();
+            openModal(id);
+        }
+
+        function saveEvents() {
+            localStorage.setItem('kronos-events', JSON.stringify(events));
+        }
+
+        function renderEvents() {
+            const grid = document.getElementById('events-grid');
+            const empty = document.getElementById('empty-state');
+            grid.innerHTML = '';
+
+            if (events.length === 0) {
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+
+            events.sort((a, b) => a.date - b.date).forEach(event => {
+                const card = document.createElement('div');
+                card.className = 'event-card glass rounded-[2.5rem] p-8 cursor-pointer relative overflow-hidden animate-in';
+                card.onclick = () => enterFullscreenMode(event.id);
+                
+                const bg = document.createElement('div');
+                bg.className = 'absolute inset-0 opacity-[0.03] grayscale bg-cover bg-center -z-10';
+                bg.style.backgroundImage = `url('${event.imageUrl}')`;
+                
+                const timeLeft = calculateTime(event.date);
+                const isPast = event.date < Date.now();
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start relative z-10 mb-8">
+                        <div>
+                            <h3 class="text-2xl font-bold tracking-tight mb-1">${event.name}</h3>
+                            <p class="text-[10px] uppercase tracking-widest text-slate-500 font-bold">${new Date(event.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="openEdit(event, '${event.id}')" class="p-2 hover:bg-white/10 rounded-full text-slate-500 hover:text-white transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                            <button onclick="deleteEvent(event, '${event.id}')" class="p-2 hover:bg-white/10 rounded-full text-slate-500 hover:text-red-400 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-4 text-center" id="timer-${event.id}">
+                        ${renderTimerHTML(timeLeft, isPast)}
+                    </div>
+                `;
+                card.prepend(bg);
+                grid.appendChild(card);
+            });
+        }
+
+        function calculateTime(targetDate) {
+            const difference = targetDate - Date.now();
+            if (difference <= 0) return { d: 0, h: 0, m: 0, s: 0, raw: 0 };
+            return {
+                d: Math.floor(difference / (1000 * 60 * 60 * 24)),
+                h: Math.floor((difference / (1000 * 60 * 60)) % 24),
+                m: Math.floor((difference / 1000 / 60) % 60),
+                s: Math.floor((difference / 1000) % 60),
+                raw: difference
+            };
+        }
+
+        function renderTimerHTML(t, isPast) {
+            if (isPast) return `<div class="col-span-4 py-4 text-indigo-400 font-black tracking-[0.3em] uppercase">Completed</div>`;
+            return `
+                <div><span class="text-2xl font-black block">${t.d}</span><span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Days</span></div>
+                <div><span class="text-2xl font-black block">${t.h}</span><span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Hrs</span></div>
+                <div><span class="text-2xl font-black block">${t.m}</span><span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Min</span></div>
+                <div><span class="text-2xl font-black block text-blue-400">${t.s}</span><span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest text-blue-400/50">Sec</span></div>
+            `;
+        }
+
+        function updateAllCountdowns() {
+            const now = Date.now();
+            events.forEach(event => {
+                const timerContainer = document.getElementById(`timer-${event.id}`);
+                const timeLeft = calculateTime(event.date);
+                const isPast = event.date < now;
+
+                // Handle completion notification
+                if (isPast && !event.notified) {
+                    playAlert();
+                    event.notified = true;
+                    saveEvents();
+                    renderEvents();
+                }
+
+                // Update visual timer
+                if (timerContainer) timerContainer.innerHTML = renderTimerHTML(timeLeft, isPast);
+
+                // Fullscreen specific logic
+                if (activeFullscreenId === event.id) {
+                    updateFullscreenUI(event.name, timeLeft, isPast);
+                    
+                    // Handle Ticking Sound in Fullscreen
+                    if (!isPast && !isMuted && event.soundType !== 'none') {
+                        handleTickSound(event, timeLeft.raw);
+                    }
+                }
+            });
+        }
+
+        function handleTickSound(event, remaining) {
+            const totalDuration = event.date - (event.startTime || (event.date - 86400000)); // Default to 24h if missing
+            const percentageRemaining = remaining / totalDuration;
+            const isWarningZone = percentageRemaining <= 0.07;
+            
+            const audio = event.soundType === 'click' ? clickAudio : beepAudio;
+            
+            // Set speed (twice the speed if 7% or less)
+            audio.playbackRate = isWarningZone ? 2.0 : 1.0;
+            
+            // Play sound
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const icon = document.getElementById('mute-icon');
+            if (isMuted) {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636M9.172 9.172L5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v4.172" />';
+            } else {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />';
+            }
+        }
+
+        function enterFullscreenMode(id) {
+            const event = events.find(e => e.id === id);
+            if (!event) return;
+            activeFullscreenId = id;
+            const overlay = document.getElementById('fullscreen-overlay');
+            overlay.style.display = 'flex';
+            overlay.style.backgroundImage = `linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.8)), url('${event.imageUrl}')`;
+            if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+            updateFullscreenUI(event.name, calculateTime(event.date), event.date < Date.now());
+        }
+
+        function exitFullscreenMode() {
+            activeFullscreenId = null;
+            document.getElementById('fullscreen-overlay').style.display = 'none';
+            if (document.exitFullscreen && document.fullscreenElement) document.exitFullscreen();
+        }
+
+        function updateFullscreenUI(name, t, isPast) {
+            document.getElementById('fs-title').innerText = name;
+            document.getElementById('fs-days').innerText = String(t.d).padStart(2, '0');
+            document.getElementById('fs-hours').innerText = String(t.h).padStart(2, '0');
+            document.getElementById('fs-minutes').innerText = String(t.m).padStart(2, '0');
+            document.getElementById('fs-seconds').innerText = String(t.s).padStart(2, '0');
+            const status = document.getElementById('fs-status');
+            status.innerText = isPast ? "Timeline Reached" : "Countdown in Progress";
+            if (isPast) status.classList.add('pulse', 'text-indigo-400');
+        }
+
+        function playAlert() {
+            alertAudio.currentTime = 0;
+            alertAudio.play().catch(() => {});
+        }
+
+        function testAudio() {
+            playAlert();
+            const btn = event.target;
+            const oldContent = btn.innerText;
+            btn.innerText = "✅";
+            setTimeout(() => btn.innerText = oldContent, 2000);
+        }
+
+        document.onfullscreenchange = () => { if (!document.fullscreenElement) exitFullscreenMode(); };
+    </script>
+</body>
+</html>
